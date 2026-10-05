@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">SoundSync</string>
+    <string name="sync_channel_name">Синхронизация треков</string>
+    <string name="sync_channel_description">Уведомления о прогрессе скачивания и синхронизации треков</string>
+</resources>
