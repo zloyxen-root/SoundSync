@@ -22,6 +22,13 @@
 
 ---
 
+## 📥 Скачать готовый APK
+
+Готовый `.apk` собирается автоматически через GitHub Actions:
+- **[Скачать SoundSync.apk (Latest Release)](https://github.com/zloyxen-root/SoundSync/releases/tag/latest-build)**
+
+---
+
 ## 🛠 Технический стек
 
 - **Язык:** Kotlin 1.9.22
