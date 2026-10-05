@@ -127,18 +127,32 @@ class SoundCloudClient(
         val tracks = mutableListOf<Track>()
         val root = JsonParser.parseString(jsonString).asJsonObject
         
-        val collection = root.getAsJsonArray("collection") ?: JsonArray()
+        val collection = if (root.has("collection") && !root.get("collection").isJsonNull && root.get("collection").isJsonArray) {
+            root.getAsJsonArray("collection")
+        } else {
+            JsonArray()
+        }
+
         for (elem in collection) {
+            if (elem == null || elem.isJsonNull || !elem.isJsonObject) continue
             val item = elem.asJsonObject
             // Item can be track directly or like wrapper { "track": {...} }
-            val trackObj = if (item.has("track")) item.getAsJsonObject("track") else item
+            val trackObj = if (item.has("track") && !item.get("track").isJsonNull && item.get("track").isJsonObject) {
+                item.getAsJsonObject("track")
+            } else {
+                item
+            }
             
-            if (trackObj != null && trackObj.has("id")) {
+            if (trackObj != null && trackObj.has("id") && !trackObj.get("id").isJsonNull) {
                 parseSingleTrack(trackObj)?.let { tracks.add(it) }
             }
         }
 
-        val nextHref = root.get("next_href")?.asString
+        val nextHref = if (root.has("next_href") && !root.get("next_href").isJsonNull) {
+            root.get("next_href").asString
+        } else {
+            null
+        }
         return LikesResult(tracks = tracks, nextHref = nextHref)
     }
 
@@ -224,7 +238,8 @@ class SoundCloudClient(
             }
             val body = resp.body?.string() ?: throw Exception("Пустой ответ стрима")
             val json = JsonParser.parseString(body).asJsonObject
-            json.get("url")?.asString ?: throw Exception("Поле url отсутствует в ответе")
+            val streamUrl = if (json.has("url") && !json.get("url").isJsonNull) json.get("url").asString else null
+            streamUrl ?: throw Exception("Поле url отсутствует в ответе")
         }
     }
 
