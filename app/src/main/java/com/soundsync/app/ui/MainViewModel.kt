@@ -108,7 +108,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
+        started = SharingStarted.WhileSubscribed(5000L),
         initialValue = MainUiState()
     )
 

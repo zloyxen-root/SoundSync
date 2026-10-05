@@ -2,6 +2,7 @@
 agp = "8.3.2"
 kotlin = "1.9.23"
 ksp = "1.9.23-1.0.20"
+composeCompiler = "1.5.13"
 coreKtx = "1.13.1"
 lifecycleRuntimeKtx = "2.7.0"
 activityCompose = "1.8.2"

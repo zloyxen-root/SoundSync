@@ -372,7 +372,7 @@ fun SyncActionBar(
                                 syncState.currentTrackIndex.toFloat() / syncState.totalTracksToDownload.toFloat()
                             } else 0f
                             LinearProgressIndicator(
-                                progress = { progress },
+                                progress = progress,
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
