@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   build:
@@ -24,8 +25,11 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: '8.5'
 
@@ -35,17 +39,19 @@ jobs:
       - name: Prepare APK file
         run: |
           mkdir -p release_apk
-          cp app/build/outputs/apk/debug/*.apk release_apk/SoundSync.apk
+          find app/build/outputs/apk/debug -name "*.apk" -exec cp {} release_apk/SoundSync.apk \;
+          ls -la release_apk/
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: SoundSync-debug
+          name: SoundSync-APK
           path: release_apk/SoundSync.apk
           if-no-files-found: error
 
       - name: Create or Update GitHub Release
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        continue-on-error: true
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest-build

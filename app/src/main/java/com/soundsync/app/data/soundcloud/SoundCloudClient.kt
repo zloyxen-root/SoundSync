@@ -54,10 +54,10 @@ class SoundCloudClient(
                 val body = response.body?.string() ?: return@withContext Result.failure(Exception("Пустой ответ от сервера"))
                 val json = JsonParser.parseString(body).asJsonObject
 
-                val id = json.get("id")?.asLong ?: return@withContext Result.failure(Exception("ID пользователя не найден"))
-                val username = json.get("username")?.asString ?: permalink
-                val avatarUrl = json.get("avatar_url")?.asString
-                val likesCount = json.get("likes_count")?.asInt ?: json.get("public_favorites_count")?.asInt ?: 0
+                val id = json.optLong("id") ?: return@withContext Result.failure(Exception("ID пользователя не найден"))
+                val username = json.optString("username") ?: permalink
+                val avatarUrl = json.optString("avatar_url")
+                val likesCount = json.optInt("likes_count") ?: json.optInt("public_favorites_count") ?: 0
 
                 Result.success(
                     SoundCloudUserProfile(
@@ -143,39 +143,47 @@ class SoundCloudClient(
     }
 
     private fun parseSingleTrack(json: JsonObject): Track? {
-        val id = json.get("id")?.asLong ?: return null
-        val title = json.get("title")?.asString ?: "Untitled"
+        val id = json.optLong("id") ?: return null
+        val title = json.optString("title") ?: "Untitled"
         
         // Artist logic: use user.username or extract from title
-        val userObj = json.getAsJsonObject("user")
-        val artist = userObj?.get("username")?.asString ?: "Unknown Artist"
+        val userObj = if (json.has("user") && !json.get("user").isJsonNull && json.get("user").isJsonObject) {
+            json.getAsJsonObject("user")
+        } else null
+        val artist = userObj?.optString("username") ?: "Unknown Artist"
         
-        val durationMs = json.get("duration")?.asLong ?: 0L
-        var artworkUrl = json.get("artwork_url")?.asString
+        val durationMs = json.optLong("duration") ?: 0L
+        var artworkUrl = json.optString("artwork_url")
         if (artworkUrl == null) {
-            artworkUrl = userObj?.get("avatar_url")?.asString
+            artworkUrl = userObj?.optString("avatar_url")
         }
         // Upgrade artwork to t500x500 for best quality
         artworkUrl = artworkUrl?.replace("large.jpg", "t500x500.jpg")
             ?.replace("large.png", "t500x500.png")
 
-        val permalinkUrl = json.get("permalink_url")?.asString
-        val genre = json.get("genre")?.asString
-        val lastModified = json.get("last_modified")?.asString
+        val permalinkUrl = json.optString("permalink_url")
+        val genre = json.optString("genre")
+        val lastModified = json.optString("last_modified")
 
         // Media transcodings
         var progressiveUrl: String? = null
         var hlsUrl: String? = null
 
-        val media = json.getAsJsonObject("media")
-        if (media != null && media.has("transcodings")) {
+        val media = if (json.has("media") && !json.get("media").isJsonNull && json.get("media").isJsonObject) {
+            json.getAsJsonObject("media")
+        } else null
+
+        if (media != null && media.has("transcodings") && !media.get("transcodings").isJsonNull && media.get("transcodings").isJsonArray) {
             val transcodings = media.getAsJsonArray("transcodings")
             for (t in transcodings) {
+                if (t == null || t.isJsonNull || !t.isJsonObject) continue
                 val tObj = t.asJsonObject
-                val url = tObj.get("url")?.asString ?: continue
-                val format = tObj.getAsJsonObject("format")
-                val protocol = format?.get("protocol")?.asString ?: ""
-                val mimeType = format?.get("mime_type")?.asString ?: ""
+                val url = tObj.optString("url") ?: continue
+                val format = if (tObj.has("format") && !tObj.get("format").isJsonNull && tObj.get("format").isJsonObject) {
+                    tObj.getAsJsonObject("format")
+                } else null
+                val protocol = format?.optString("protocol") ?: ""
+                val mimeType = format?.optString("mime_type") ?: ""
 
                 if (protocol == "progressive" && mimeType.contains("mpeg")) {
                     progressiveUrl = url
@@ -353,5 +361,26 @@ class SoundCloudClient(
             clean = clean.substringAfter("soundcloud.com/").substringBefore("?").substringBefore("/")
         }
         return clean.trim('/')
+    }
+
+    private fun JsonObject.optString(key: String): String? {
+        if (!has(key)) return null
+        val elem = get(key)
+        if (elem == null || elem.isJsonNull) return null
+        return try { elem.asString } catch (e: Exception) { null }
+    }
+
+    private fun JsonObject.optLong(key: String): Long? {
+        if (!has(key)) return null
+        val elem = get(key)
+        if (elem == null || elem.isJsonNull) return null
+        return try { elem.asLong } catch (e: Exception) { null }
+    }
+
+    private fun JsonObject.optInt(key: String): Int? {
+        if (!has(key)) return null
+        val elem = get(key)
+        if (elem == null || elem.isJsonNull) return null
+        return try { elem.asInt } catch (e: Exception) { null }
     }
 }

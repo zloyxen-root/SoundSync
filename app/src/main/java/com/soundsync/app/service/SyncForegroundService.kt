@@ -67,7 +67,12 @@ class SyncForegroundService : Service() {
                 stopSelf()
             }
             ACTION_START_SYNC -> {
-                startForeground(NOTIFICATION_ID, buildNotification("Подготовка к синхронизации...", 0, 0))
+                val notif = buildNotification("Подготовка к синхронизации...", 0, 0)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    startForeground(NOTIFICATION_ID, notif, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+                } else {
+                    startForeground(NOTIFICATION_ID, notif)
+                }
                 observeAndExecute()
             }
         }
