@@ -1,5 +1,7 @@
 # SoundSync (Android)
 
+[![Build Android APK](https://github.com/zloyxen-root/SoundSync/actions/workflows/build.yml/badge.svg)](https://github.com/zloyxen-root/SoundSync/actions/workflows/build.yml)
+
 Автономное Android-приложение для синхронизации лайков из SoundCloud в локальную музыкальную библиотеку телефона (MP3 в высоком качестве с ID3v2.3 тегами и обложками).
 
 ---
