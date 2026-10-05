@@ -16,7 +16,6 @@ import com.soundsync.app.util.StorageHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -45,30 +44,42 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val prefs = UserPreferences(context)
     private val syncEngine = SyncEngine(context)
 
-    private val _isResolving = MutableStateFlow(false)
-    private val _profileError = MutableStateFlow<String?>(null)
-    private val _searchQuery = MutableStateFlow("")
-
-    private val _profile = MutableStateFlow(
-        if (prefs.userId > 0L) {
-            SoundCloudUserProfile(
-                id = prefs.userId,
-                username = prefs.userName,
-                permalink = prefs.profileInput,
-                avatarUrl = prefs.avatarUrl,
-                likesCount = 0
-            )
-        } else null
+    private data class ProfileState(
+        val profile: SoundCloudUserProfile?,
+        val isResolving: Boolean,
+        val error: String?
     )
 
+    private val _profileState = MutableStateFlow(
+        ProfileState(
+            profile = if (prefs.userId > 0L) {
+                SoundCloudUserProfile(
+                    id = prefs.userId,
+                    username = prefs.userName,
+                    permalink = prefs.profileInput,
+                    avatarUrl = prefs.avatarUrl,
+                    likesCount = 0
+                )
+            } else null,
+            isResolving = false,
+            error = null
+        )
+    )
+
+    private val _searchQuery = MutableStateFlow("")
+
+    // Expose isResolving and profileError as derived flows for backward compatibility
+    private val _isResolving get() = _profileState.value.isResolving
+    private val _profileError get() = _profileState.value.error
+    private val _profile get() = _profileState.value.profile
+
+    // combine() supports max 5 flows — split into two stages
     val uiState: StateFlow<MainUiState> = combine(
-        _profile,
-        _isResolving,
-        _profileError,
+        _profileState,
         syncEngine.syncState,
         trackDao.getAllTracksFlow(),
         _searchQuery
-    ) { profile, isResolving, profileError, syncState, allTracks, query ->
+    ) { profileState, syncState, allTracks, query ->
         val filteredTracks = if (query.isBlank()) {
             allTracks
         } else {
@@ -81,9 +92,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val totalSize = allTracks.sumOf { it.fileSizeBytes }
 
         MainUiState(
-            isResolvingProfile = isResolving,
-            profileError = profileError,
-            profile = profile,
+            isResolvingProfile = profileState.isResolving,
+            profileError = profileState.error,
+            profile = profileState.profile,
             syncState = syncState,
             tracks = filteredTracks,
             searchQuery = query,
@@ -107,13 +118,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun connectProfile(input: String, oauthToken: String = "", customClientId: String = "") {
         if (input.isBlank()) {
-            _profileError.value = "Введите ссылку или юзернейм SoundCloud"
+            _profileState.value = _profileState.value.copy(error = "Введите ссылку или юзернейм SoundCloud")
             return
         }
 
         viewModelScope.launch {
-            _isResolving.value = true
-            _profileError.value = null
+            _profileState.value = _profileState.value.copy(isResolving = true, error = null)
 
             val client = SoundCloudClient(
                 customClientId = customClientId.ifBlank { null },
@@ -129,18 +139,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 prefs.oauthToken = oauthToken
                 prefs.customClientId = customClientId
 
-                _profile.value = user
-                _isResolving.value = false
+                _profileState.value = ProfileState(profile = user, isResolving = false, error = null)
             }.onFailure { error ->
-                _profileError.value = error.message ?: "Ошибка подключения к профилю"
-                _isResolving.value = false
+                _profileState.value = _profileState.value.copy(
+                    isResolving = false,
+                    error = error.message ?: "Ошибка подключения к профилю"
+                )
             }
         }
     }
 
     fun startSync() {
         if (prefs.userId <= 0L) {
-            _profileError.value = "Сначала укажите профиль SoundCloud"
+            _profileState.value = _profileState.value.copy(error = "Сначала укажите профиль SoundCloud")
             return
         }
         SyncForegroundService.startSync(context)
